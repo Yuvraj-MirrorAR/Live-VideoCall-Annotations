@@ -1,3 +1,6 @@
+import sys
+
+sys.path.append("packages/")
 import argparse
 import asyncio
 from asyncio.windows_events import NULL
@@ -43,9 +46,9 @@ mlModelName = "pose"
 load_dotenv()
 
 # Create a Twilio client
-account_sid = os.environ["TWILIO_ACCOUNT_SID"]
-api_key = os.environ["TWILIO_API_KEY_SID"]
-api_secret = os.environ["TWILIO_API_KEY_SECRET"]
+account_sid = "AC5666adc265c82bdac1292090abb4c37c"
+api_key = "SK524d1beb703e898206f21959e4823816"
+api_secret = "iWaGvl0B6alw2Bqe47VjDgkiMHfFB7l2"
 twilio_client = twilio.rest.Client(api_key, api_secret, account_sid)
 
 

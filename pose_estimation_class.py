@@ -1,3 +1,6 @@
+import sys
+
+sys.path.append("packages/")
 
 import cv2
 import mediapipe as mp
