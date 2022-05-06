@@ -8,11 +8,13 @@ import ssl
 import uuid
 import mediapipe as mp
 import time
+# import tflitemodel as mytfLite
 import pose_estimation_class as pm
 import twilio.jwt.access_token
 import twilio.jwt.access_token.grants
 import twilio.rest
 from dotenv import load_dotenv
+# import tensorflow as tf
 
 import cv2
 from aiohttp import web
@@ -31,6 +33,11 @@ face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 mlModelName = "pose"
 # Twilio Functions and Variables
+
+# from torchvision.models import detection
+# from imutils.video import VideoStream
+# from imutils.video import FPS
+
 
 # Load environment variables from a .env file
 load_dotenv()
@@ -97,6 +104,16 @@ async def join_room(request):
 
 
 
+# # Load TFLite model and allocate tensors.
+# interpreter = tf.lite.Interpreter(model_path="coco_ssd_mobilenet/detect.tflite")
+# interpreter.allocate_tensors()
+
+# # Get input and output tensors.
+# input_details = interpreter.get_input_details()
+# output_details = interpreter.get_output_details()
+
+# category_index = mytfLite.create_category_index()
+# input_shape = input_details[0]['shape']
 
 
 class VideoTransformTrack(MediaStreamTrack):
@@ -111,29 +128,93 @@ class VideoTransformTrack(MediaStreamTrack):
         self.track = track
         self.transform = transform
         self.pTime = 0
+        self.skip_frame_cnt = 2
+        self.count = 0
+        self.lastFrame = NULL
+        self.countAll = 0
+        self.frameCount = 0
+        self.lastTimerCount = 0
+        self.annotatedLastImage = False
+      
 
     async def recv(self):
+        now = time.time()
+      
+
         frame = await self.track.recv()
         img = frame.to_ndarray(format="bgr24")
         mlModelName = self.transform
+        if self.count == 0:
+            self.lastFrame = frame
+        self.count += 1
+        now = time.time()
+        if self.lastTimerCount == 0 :
+            self.lastTimerCount = now
+        else: 
+            self.frameCount = self.frameCount + 1
+            self.countAll = self.countAll + (now - self.lastTimerCount)
+            print("Time between frames is: {} sec".format(self.countAll/self.frameCount))
+            self.lastTimerCount = now
+          
+        if self.count % self.skip_frame_cnt != 0: return self.lastFrame# skip this frame 
         # print(mlModelName)
-    
+
         if mlModelName == "cartoon":
-            new_frame = self.MakeCartoon(frame, img)
+            mytfLite.make_and_show_inference(img, interpreter, input_details, output_details, category_index)
+            new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+            new_frame.pts = frame.pts
+            new_frame.time_base = frame.time_base
+            # new_frame = self.MakeCartoon(frame, img)
+            # self.lastFrame = new_frame
             return new_frame
         elif mlModelName == "text":
             new_frame = self.AddTextOnImage(frame, img)
+            self.lastFrame = new_frame
+            then = time.time()
+            # if self.lastTimerCount == 0 :
+            #     self.lastTimerCount = then
+            # else: 
+            #     self.frameCount = self.frameCount + 1
+            #     self.countAll = self.countAll + (then - self.lastTimerCount)
+            #     print("Time between frames is: {} sec".format(self.countAll/self.frameCount))
+            #     self.lastTimerCount = then
+            # print("Detected pose in: {} sec".format(then - now))
+           
             return new_frame
         elif mlModelName == "face":
             new_frame = self.DetectFace(frame, img)
+            then = time.time()
+            # if self.lastTimerCount == 0 :
+            #     self.lastTimerCount = then
+            # else: 
+            #     self.frameCount = self.frameCount + 1
+            #     self.countAll = self.countAll + (then - self.lastTimerCount)
+            #     print("Time between frames is: {} sec".format(self.countAll/self.frameCount))
+            #     self.lastTimerCount = then
+            # print("Detected pose in: {} sec".format(then - now))
+           
+            self.lastFrame = new_frame
             return new_frame
         elif mlModelName == "edge":
             new_frame = self.DetectEdge(frame, img)
+            self.lastFrame = new_frame
             return new_frame
         elif mlModelName == "pose":
             new_frame = self.PoseDetection(frame, img) 
+            then = time.time()
+            # if self.lastTimerCount == 0 :
+            #     self.lastTimerCount = then
+            # else: 
+            #     self.frameCount = self.frameCount + 1
+            #     self.countAll = self.countAll + (then - self.lastTimerCount)
+            #     print("Time between frames is: {} sec".format(self.countAll/self.frameCount))
+            #     self.lastTimerCount = then
+            # print("Detected pose in: {} sec".format(then - now))
+            self.lastFrame = new_frame
+            self.annotatedLastImage = True
             return new_frame   
         else:
+            self.lastFrame = new_frame
             return frame
 
     def AddTextOnImage(self, frame, img):
@@ -265,6 +346,7 @@ async def offer(request):
                     relay.subscribe(track),transform=params["video_transform"]
                 )
             )
+            print("AYA")
             # if args.record_to:
             #     recorder.addTrack(relay.subscribe(track))
 
